@@ -57,8 +57,7 @@ def create_db(filepath, fields, rcrditer):
             (DBConstants._DICT_TABLE, fieldsub, qmarks)
     # Pull data from the iterator and store in database
     # Commiting in batches seems faster than a single call to executemany
-    data = (tuple(record[fieldname] for fieldname, role in fields) \
-            for record in rcrditer)
+    data = records_to_fields(rcrditer, fields)
     while True:
         batch = list(itertools.islice(data, 10000))
         if not batch: break
@@ -78,3 +77,20 @@ def create_db(filepath, fields, rcrditer):
 
     con.commit()
     con.close()
+
+
+class records_to_fields(object):
+    """
+    Iterator class for returning tuples of record data
+    """
+    def __init__(self, ri, fields):
+        self.ri = ri
+        self.fields = fields
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        record = self.ri.next()
+        return tuple(record[fieldname] for fieldname, role in self.fields)
+        
