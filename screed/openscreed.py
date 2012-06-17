@@ -1,12 +1,58 @@
-import DBConstants
 import os
 import types
 import UserDict
-import screedRecord
-import DBConstants
-import os
 import types
 import sqlite3
+import gzip
+import bz2
+
+import DBConstants
+import screedRecord
+from fastq import fastq_iter, FASTQ_Writer
+from fasta import fasta_iter, FASTA_Writer
+
+def get_writer_class(read_iter):
+    if read_iter.__name__ == 'fasta_iter':
+        return FASTA_Writer
+    elif read_iter.__name__ == 'fastq_iter':
+        return FASTQ_Writer
+
+def open_writer(inp_filename, outp_filename):
+    read_iter = open_reader(inp_filename) 
+    klass = get_writer_class(read_iter)
+    return klass(outp_filename)
+
+def open_reader(filename, *args, **kwargs):
+    """
+    Make a best-effort guess as to how to open/parse the given sequence file.
+
+    Deals with .gz, FASTA, and FASTQ records.
+    """
+    if filename.endswith('.gz'):
+        fp = gzip.open(filename)
+    elif filename.endswith('.bz2'):
+        fp = bz2.BZ2File(filename)
+    else:
+        fp = file(filename)
+
+    line = fp.readline()
+
+    if not line:
+        return []
+
+    iter_fn = None
+    if line.startswith('>'):
+        iter_fn = fasta_iter
+    elif line.startswith('@'):
+        iter_fn = fastq_iter
+
+    if iter_fn is None:
+        raise Exception("unknown file format for '%s'" % filename)
+
+    fp.seek(0)
+    return iter_fn(fp, *args, **kwargs)
+
+open = open_reader
 
 class ScreedDB(object, UserDict.DictMixin):
     """
